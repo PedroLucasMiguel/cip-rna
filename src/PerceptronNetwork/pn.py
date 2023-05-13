@@ -1,26 +1,32 @@
+import os
+import time
 import json
 import numpy as np
 import matplotlib.pyplot as plt
+from datetime import datetime
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
+# Classe responsável pela criação da rede Perceptron
 class PerceptronNetwork:
     def __init__(self, 
                  n_input_features:int = 4,
                  random_weight_initialization:bool = False,
                  random_bias_initialization:bool = False,
-                 n_classes:int = 1) -> None:
+                 n_classes:int = 1,
+                 identifier:str = "") -> None:
         
+        self.__identifier = identifier
         self.__weights = np.zeros((n_classes, n_input_features), dtype=np.float64)
         self.__bias = np.zeros((n_classes), dtype=np.float64) if n_classes > 1 else 0.0
         self.__n_classes = n_classes
-
-        # TODO - Precisa revisar
+        
+        # Inicialização aleatória de pesos
         if random_weight_initialization:
             for i in range(self.__weights.shape[0]):
                 for j in range(self.__weights.shape[1]):
                     self.__weights[i][j] = np.random.normal(scale=0.01)
 
-        # TODO - Precisa revisar
+        # Inicialização aleatória de Bias
         if random_bias_initialization:
             if n_classes == 1:
                 self.__bias = np.random.normal(scale=0.01)
@@ -29,13 +35,15 @@ class PerceptronNetwork:
                         self.__bias[i] = np.random.normal(scale=0.01)
 
         pass
-
+    
+    # Função responsável pelo "Forward pass" da rede perceptron
     def forward(self, data_point):
         
         outputs = []
         outputs_exp = []
 
         for i in range(self.__weights.shape[0]):
+            # Calculando o resultado da classificação
             neuron_output = self.__weights[i][:]*data_point
             neuron_output += self.__bias[i]
             neuron_output = np.sum(neuron_output)
@@ -53,9 +61,9 @@ class PerceptronNetwork:
 
         return np.array(softmax)
 
+    # Função responsável por realizar o treino da rede perceptron
     def train(self, dataset, epochs:int = 30, learning_rate:float = 0.01):
         epoch = 1
-        error = 1
 
         # Necessário para realizar o processo de "checkpoint"
         best_f1 = None
@@ -78,6 +86,8 @@ class PerceptronNetwork:
         # Dicionário para armazenar os resultados de cada epoch
         json_output = {}
 
+        # Aqui a condição de parada é apenas o número de epochs
+        # Isso é perfeitamente aceitável dado o uso dos "checkpoints"
         while epoch <= epochs:
             
             error = 0
@@ -109,12 +119,12 @@ class PerceptronNetwork:
                 # Calculando o erro médio quadrático
                 error += np.mean(data_error**2)
             
-            # Realizando validação
+            # Realizando teste de validação
             for data in validation_data:
                 expected_values.append(data[1])
                 network_outputs.append(np.argmax(self.forward(data[0])))
             
-            # Calculando as métricas de: Precisão, recall, medida-f e acurácia
+            # Calculando as métricas de: Precisão, recall, medida-f e acurácia pós validação
             precision = precision_score(expected_values, network_outputs, average="macro", zero_division=1)
             recall = recall_score(expected_values, network_outputs, average="macro", zero_division=1)
             f1 = f1_score(expected_values, network_outputs, average="macro", zero_division=1)
@@ -140,7 +150,8 @@ class PerceptronNetwork:
                 best_f1 = f1
                 weights_checkpoint = self.__weights.copy()
                 bias_checkpoint = self.__bias.copy()
-            # Salvamos a epoch que possuiu a melhor medida-f de todas as epochhs no momento
+
+            # Salvamos a epoch que possuiu a melhor medida-f de todas as epochs no momento
             # Isso ajuda a evitar problemas como overfitting
             elif f1 > best_f1:
                 best_epoch = epoch
@@ -148,10 +159,13 @@ class PerceptronNetwork:
                 weights_checkpoint = self.__weights.copy()
                 bias_checkpoint = self.__bias.copy()
 
-            print("Finished: {}° epoch".format(epoch))
+            print("{}° época finalizada".format(epoch))
 
             epoch += 1
         
+        print("\nTreinamento Finalizado!\nExecutando os testes...\n")
+        time.sleep(1)
+
         # Definindo os pesos/bias como os melhores obtidos durante a fase de treinamento
         self.__weights = weights_checkpoint.copy()
         self.__bias = bias_checkpoint.copy()
@@ -165,53 +179,64 @@ class PerceptronNetwork:
             test_expected.append(expected)
             text_output.append(np.argmax(output))
 
-            print("Expected: {} | Output: {}".format(expected, np.argmax(output)))
+            print("Esperado: {} | Saída da rede: {}".format(expected, np.argmax(output)))
 
         # Resultados finais
-        print("Test accuracy: {}".format(accuracy_score(test_expected, text_output)))
-        print("Best epoch: {}".format(best_epoch))
+        print("\nAcurácia dos testes: {}".format(accuracy_score(test_expected, text_output)))
+        print("Melhor época: {}".format(best_epoch))
+        print("Métricas da melhor época:")
         print(json_output[best_epoch])
+        print("Pesos: {}".format(self.__weights))
+        print("Bias: {}".format(self.__bias))
+
+        folder_name = datetime.now()
+        folder_name = folder_name.strftime("%d-%m-%Y_%H-%M-%S")
+        folder_name = folder_name + "_{}".format(self.__identifier)
+        
+        try:
+            os.mkdir("../output/{}".format(folder_name))
+        except FileExistsError:
+            pass
 
         # Gerando gráficos
         x_axis = list(range(epochs))
         plt.figure(figsize=(12.8, 4.8))
         plt.plot(x_axis, precision_data, label="Precisão")
         plt.plot(x_axis, recall_data, label="Recall")
-        plt.plot(x_axis, f1_data, label="Medida F")
-        plt.xlabel("Epoch")
-        plt.title("Precisão, Recall e Medida F para {} epochs".format(epochs))
+        plt.plot(x_axis, f1_data, label="Medida-F")
+        plt.xlabel("Época")
+        plt.title("Precisão, Recall e Medida F para {} épocas".format(epochs))
         plt.legend()
-        plt.savefig("../output/metrics.png")
+        plt.savefig("../output/{}/metrics.png".format(folder_name))
         plt.cla()
 
         x_axis = list(range(epochs))
         plt.figure(figsize=(12.8, 4.8))
         plt.plot(x_axis, accuracy_data, label="Acurácia")
-        plt.xlabel("Epoch")
-        plt.title("Acurácia para {} epochs".format(epochs))
+        plt.xlabel("Época")
+        plt.title("Acurácia para {} épocas".format(epochs))
         plt.legend()
-        plt.savefig("../output/accuracy.png")
+        plt.savefig("../output/{}/accuracy.png".format(folder_name))
         plt.cla()
 
         x_axis = list(range(epochs))
         plt.figure(figsize=(12.8, 4.8))
         plt.plot(x_axis, error_data, label="Erro médio quadrático")
-        plt.xlabel("Epoch")
-        plt.title("Erro médio quadrático para {} epochs".format(epochs))
+        plt.xlabel("Época")
+        plt.title("Erro médio quadrático para {} épocas".format(epochs))
         plt.legend()
-        plt.savefig("../output/meansquareerror.png")
+        plt.savefig("../output/{}/mean_square_error.png".format(folder_name))
         plt.cla()
 
         # Salvando os resultados de cada epoch em um arquivo .json
-        with open("../output/epochs.json", "w") as json_file:
+        with open("../output/{}/epochs.json".format(folder_name), "w") as json_file:
             json_string = json.dumps(json_output)
             json_file.write(json_string)
+
+        print("\nGráficos e métricas de treino salvos em output/{}".format(folder_name))
 
     def get_weights(self):
         return self.__weights
     
     def get_bias(self):
         return self.__bias
-
-    def __str__(self) -> str:
-        return "Hello World!"
