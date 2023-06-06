@@ -69,7 +69,7 @@ def get_lime(img:str):
         return F.softmax(outputs, dim=1).detach().cpu().numpy()
 
     # Criando a imagem com a explicação e apresentando ela em um plot
-    explanation = explainer.explain_instance(np.array(pill_transf(img)), classify_func, top_labels=1, hide_color=0, num_samples=3000)
+    explanation = explainer.explain_instance(np.array(pill_transf(img)), classify_func, top_labels=1, hide_color=0, num_samples=1000)
     print("\nClassificação do modelo: {}\n".format("Gato" if explanation.top_labels[0] == 0 else "Cachorro"))
     temp, mask = explanation.get_image_and_mask(explanation.top_labels[0], positive_only=True, num_features=5, hide_rest=False)
     img_boundry1 = mark_boundaries(temp/255.0, mask)

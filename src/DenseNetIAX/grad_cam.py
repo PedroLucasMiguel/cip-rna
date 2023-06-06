@@ -77,14 +77,16 @@ def get_grad_cam(img:str):
     print("\nClassificação do modelo: {}".format("Gato" if class_to_backprop == 0 else "Cachorro"))
     outputs[:, class_to_backprop].backward()
 
-    # Obtendo informações dos gradienttes e construindo o "heatmap"
+    # Obtendo informações dos gradientes e construindo o "heatmap"
     gradients = model.get_activations_gradient()
     gradients = torch.mean(gradients, dim=[0, 2, 3])
     layer_output = model.get_activations(input_batch)
 
+    # Atribuindo os valores de importância
     for i in range(len(gradients)):
         layer_output[:, i, :, :] *= gradients[i]
 
+    # Por fim, este é o nosso mapa de ativações!
     layer_output = layer_output[0, : , : , :]
 
     # Salvando imagens
@@ -97,7 +99,7 @@ def get_grad_cam(img:str):
     heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
     superimposed_img = heatmap * 0.4 + img
     cv2.imwrite("../output/gradient.jpg", heatmap)
-    final_img = np.concatenate((img, superimposed_img), axis=1)
-    cv2.imwrite("../output/map.jpg", final_img)
+    #final_img = np.concatenate((img, superimposed_img), axis=1)
+    cv2.imwrite("../output/map.jpg", superimposed_img)
 
     print("Imagens salvas em output/gradient.jpg e output/map.jpg\n")
